@@ -1,0 +1,72 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    ============================================================================
+    Spire Chat - 빌드 설정
+    ============================================================================
+    설정 근거는 orb_dmg_indicator.csproj와 동일하다(게임 모드 로더 동작 기준).
+    각 항목의 상세 근거는 그쪽 주석 참조.
+  -->
+
+  <PropertyGroup>
+    <!-- 게임 런타임이 net9.0이므로 동일 TFM으로 맞춘다. -->
+    <TargetFramework>net9.0</TargetFramework>
+    <OutputType>Library</OutputType>
+
+    <!-- 산출 DLL 이름은 매니페스트의 id와 반드시 같아야 한다(로더가 id + ".dll"로 찾음). -->
+    <AssemblyName>spire_chat</AssemblyName>
+    <RootNamespace>SpireChat</RootNamespace>
+
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+
+    <!-- 게임이 자기 ALC에 우리 DLL을 로드하므로 참조 어셈블리를 같이 배포하면 타입이 충돌한다. -->
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+
+    <DebugType>portable</DebugType>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <GameRoot Condition="'$(GameRoot)' == ''">C:\Program Files (x86)\Steam\steamapps\common\Slay the Spire 2</GameRoot>
+    <GameData>$(GameRoot)\data_sts2_windows_x86_64</GameData>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="sts2">
+      <HintPath>$(GameData)\sts2.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="GodotSharp">
+      <HintPath>$(GameData)\GodotSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(GameData)\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <Target Name="CheckGameAssemblies" BeforeTargets="BeforeBuild">
+    <Error Condition="!Exists('$(GameData)\sts2.dll')"
+           Text="sts2.dll을 찾을 수 없습니다: $(GameData)\sts2.dll — GameRoot 속성을 확인하세요." />
+  </Target>
+
+  <PropertyGroup>
+    <DeployToGame Condition="'$(DeployToGame)' == ''">true</DeployToGame>
+    <ModDeployDir>$(GameRoot)\mods\spire_chat</ModDeployDir>
+  </PropertyGroup>
+
+  <Target Name="DeployToMods" AfterTargets="Build" Condition="'$(DeployToGame)' == 'true'">
+    <MakeDir Directories="$(ModDeployDir)" />
+    <ItemGroup>
+      <DeployFiles Include="$(OutputPath)spire_chat.dll" />
+      <DeployFiles Include="$(OutputPath)spire_chat.pdb" Condition="Exists('$(OutputPath)spire_chat.pdb')" />
+      <DeployFiles Include="$(MSBuildProjectDirectory)\mod_manifest.json" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DeployFiles)" DestinationFolder="$(ModDeployDir)" SkipUnchangedFiles="true" />
+    <Message Importance="high" Text="[spire_chat] 배포 완료 → $(ModDeployDir)" />
+  </Target>
+
+</Project>
