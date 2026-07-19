@@ -2,7 +2,7 @@
   "id": "spire_chat",
   "name": "Spire Chat",
   "author": "GuardianGD",
-  "description": "In-game text chat for multiplayer runs. Currently an IME input probe build - not yet a working chat mod.",
+  "description": "In-game text chat for multiplayer runs. Press T to open the chat window.",
   "version": "0.0.1",
   "has_pck": false,
   "has_dll": true,

@@ -19,7 +19,7 @@ public class ChatConsoleCmd : AbstractConsoleCmd
 
     public override string Args => "";
 
-    public override string Description => "Toggle the chat overlay (currently loopback only).";
+    public override string Description => "Toggle the chat overlay.";
 
     // 로컬 UI 토글일 뿐이다. 네트워크로 전파되면 다른 플레이어 화면에도 뜬다.
     public override bool IsNetworked => false;

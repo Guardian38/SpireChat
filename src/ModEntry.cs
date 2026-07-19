@@ -3,6 +3,7 @@ using System.Reflection;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Logging;
 using MegaCrit.Sts2.Core.Modding;
+using SpireChat.Chat;
 
 namespace SpireChat;
 
@@ -32,7 +33,11 @@ public static class ModEntry
         var harmony = new Harmony($"GuardianGD.{ModId}");
         harmony.PatchAll(Assembly.GetExecutingAssembly());
 
+        // 세션 추적·수신 보관을 시작한다. 채팅창을 한 번도 열지 않아도 메시지는 쌓여야 하므로
+        // UI가 아니라 여기서 켠다.
+        ChatService.Initialize();
+
         int patched = harmony.GetPatchedMethods().Count();
-        Log.Info($"[{ModId}] loaded (loopback build). Applied {patched} Harmony patch(es). Press T to open chat.");
+        Log.Info($"[{ModId}] loaded. Applied {patched} Harmony patch(es). Press T to open chat.");
     }
 }

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Godot;
 using MegaCrit.Sts2.Core.Logging;
@@ -8,8 +9,9 @@ namespace SpireChat.Chat;
 /// <summary>
 /// 최소 채팅 UI. 입력창 하나와 메시지 목록 하나가 전부다.
 ///
-/// **전송 방식을 모른다** — <see cref="IChatTransport"/>만 통해 주고받는다.
-/// 현재는 <see cref="LoopbackChatTransport"/>를 물려 멀티플레이 세션 없이 검증한다.
+/// **전송 방식도, 세션 상태도 모른다** — <see cref="ChatService"/>에 보내달라고 하고,
+/// 쌓인 것을 읽어 그릴 뿐이다. 수신과 보관은 오버레이가 닫혀 있는 동안에도 계속돼야 하므로
+/// 창이 아니라 서비스가 맡는다.
 ///
 /// ImeProbe와 마찬가지로 커스텀 Node 서브클래스를 만들지 않고 순수 Godot 노드 조합 +
 /// C# 시그널로만 구성한다 — 모드 어셈블리의 스크립트 클래스를 씬 트리에 등록하는 문제를
@@ -17,15 +19,12 @@ namespace SpireChat.Chat;
 /// </summary>
 public static class ChatOverlay
 {
-    /// <summary>표시할 최대 줄 수. 넘으면 오래된 것부터 버린다.</summary>
+    /// <summary>화면에 보여줄 최대 줄 수. 보관 자체는 <see cref="ChatService"/>가 더 길게 한다.</summary>
     private const int MaxLines = 12;
 
     private static CanvasLayer? _root;
     private static LineEdit? _input;
     private static Label? _log;
-    private static IChatTransport? _transport;
-
-    private static readonly List<string> _lines = new();
 
     public static bool IsOpen => _root != null && GodotObject.IsInstanceValid(_root);
 
@@ -39,9 +38,14 @@ public static class ChatOverlay
         }
 
         Open();
-        return IsOpen
-            ? "chat: OPEN (loopback) — type and press Enter. ESC closes."
-            : "chat: FAILED to open (scene tree unavailable) — check the log.";
+        if (!IsOpen)
+        {
+            return "chat: FAILED to open (scene tree unavailable) — check the log.";
+        }
+
+        return ChatService.CanSend
+            ? "chat: OPEN — type and press Enter. ESC closes."
+            : "chat: OPEN (no multiplayer session — messages cannot be sent yet).";
     }
 
     private static void Open()
@@ -52,10 +56,10 @@ public static class ChatOverlay
             return;
         }
 
-        // 전송 계층은 아직 루프백이다. 실제 송수신이 준비되면 여기만 교체한다.
-        _transport = new LoopbackChatTransport();
-        _transport.Received += OnReceived;
-        _transport.Start();
+        // 노드가 외부에서 파괴돼 Close()를 못 거친 경우 구독이 남아 있을 수 있다.
+        // 먼저 떼고 붙여 중복 구독을 막는다(없는 것을 빼도 무해하다).
+        ChatService.LineAdded -= OnLineAdded;
+        ChatService.LineAdded += OnLineAdded;
 
         _root = new CanvasLayer { Layer = 100, Name = "SpireChatOverlay" };
 
@@ -76,11 +80,10 @@ public static class ChatOverlay
         var box = new VBoxContainer { CustomMinimumSize = new Vector2(760f, 0f) };
         margin.AddChild(box);
 
-        box.AddChild(new Label { Text = "spire_chat (loopback test)" });
+        box.AddChild(new Label { Text = "spire_chat" });
 
         _log = new Label
         {
-            Text = "(no messages)",
             AutowrapMode = TextServer.AutowrapMode.WordSmart,
             CustomMinimumSize = new Vector2(0f, 260f),
             VerticalAlignment = VerticalAlignment.Top
@@ -99,20 +102,18 @@ public static class ChatOverlay
         tree.Root.AddChild(_root);
         KoreanFont.Apply(_input, _log);
 
+        // 창이 닫혀 있던 동안에도 메시지는 쌓인다. 열자마자 그것부터 그린다.
+        Redraw();
+
         // 게임 UI가 아직 포커스를 쥐고 있을 수 있으므로 프레임 종료 후에 잡는다.
         _input.CallDeferred(Control.MethodName.GrabFocus);
 
-        Log.Info($"[{ModEntry.ModId}] ChatOverlay opened (loopback).");
+        Log.Info($"[{ModEntry.ModId}] ChatOverlay opened (canSend={ChatService.CanSend}).");
     }
 
     private static void Close()
     {
-        if (_transport != null)
-        {
-            _transport.Received -= OnReceived;
-            _transport.Stop();
-            _transport = null;
-        }
+        ChatService.LineAdded -= OnLineAdded;
 
         if (_root != null && GodotObject.IsInstanceValid(_root))
         {
@@ -122,7 +123,6 @@ public static class ChatOverlay
         _root = null;
         _input = null;
         _log = null;
-        _lines.Clear();
 
         Log.Info($"[{ModEntry.ModId}] ChatOverlay closed.");
     }
@@ -138,7 +138,7 @@ public static class ChatOverlay
     /// <summary>Enter로 확정했을 때. 보내기만 하고, 화면 반영은 수신 이벤트가 담당한다.</summary>
     private static void OnSubmitted(string text)
     {
-        if (_input == null || _transport == null)
+        if (_input == null)
         {
             return;
         }
@@ -149,7 +149,7 @@ public static class ChatOverlay
             return;
         }
 
-        _transport.Send(text);
+        ChatService.Send(text);
         _input.Clear();
 
         // Enter로 확정하면 LineEdit이 편집 모드를 푼다. GrabFocus만으로는 포커스만 돌아오고
@@ -162,25 +162,47 @@ public static class ChatOverlay
     }
 
     /// <summary>
-    /// 전송 계층에서 메시지가 도착했을 때. 자기가 보낸 것도 여기로 돌아오므로
-    /// 화면 갱신 경로가 하나로 통일된다 — 실제 전송으로 바꿔도 이 코드는 그대로다.
+    /// 새 줄이 쌓였을 때. 자기가 보낸 것도 서비스를 거쳐 여기로 돌아오므로
+    /// 화면 갱신 경로가 하나로 통일된다.
     /// </summary>
-    private static void OnReceived(ulong senderId, string text)
+    private static void OnLineAdded(ChatService.ChatLine line)
     {
-        if (_log == null)
+        // 씬 전환 등으로 노드가 이미 죽었을 수 있다. 그때는 여기서 구독을 끊는다 —
+        // Close()를 거치지 않고 사라진 경우라 아무도 정리해주지 않기 때문이다.
+        if (_root != null && !GodotObject.IsInstanceValid(_root))
+        {
+            Log.Info($"[{ModEntry.ModId}] ChatOverlay node was freed externally — detaching.");
+            ChatService.LineAdded -= OnLineAdded;
+            _root = null;
+            _input = null;
+            _log = null;
+            return;
+        }
+
+        Redraw();
+    }
+
+    /// <summary>보관된 것 중 마지막 <see cref="MaxLines"/>줄을 그린다.</summary>
+    private static void Redraw()
+    {
+        if (_log == null || !GodotObject.IsInstanceValid(_log))
         {
             return;
         }
 
-        string who = senderId == LoopbackChatTransport.LocalPeerId ? "나" : senderId.ToString();
-        _lines.Add($"{who}: {text}");
-
-        if (_lines.Count > MaxLines)
+        var history = ChatService.History;
+        if (history.Count == 0)
         {
-            _lines.RemoveRange(0, _lines.Count - MaxLines);
+            _log.Text = "(메시지 없음)";
+            return;
         }
 
-        _log.Text = string.Join("\n", _lines);
-        Log.Info($"[{ModEntry.ModId}] chat message from {senderId}: {text}");
+        var lines = new List<string>(MaxLines);
+        for (int i = Math.Max(0, history.Count - MaxLines); i < history.Count; i++)
+        {
+            lines.Add($"{history[i].Sender}: {history[i].Text}");
+        }
+
+        _log.Text = string.Join("\n", lines);
     }
 }
