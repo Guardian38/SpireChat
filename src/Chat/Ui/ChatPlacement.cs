@@ -92,8 +92,9 @@ public static class ChatPlacement
     /// <summary>
     /// 전투 — 손패 위, 가로 중앙. 위로 자란다(아래로 자라면 손패를 덮는다).
     ///
-    /// 손패 노드는 **존재 여부로 전투를 판별하는 데만** 쓰고, 세로 위치는
-    /// <see cref="CombatBottomOffset"/>으로 잡는다 — 이유는 그 상수 주석 참조.
+    /// **손패 노드를 아예 보지 않는다** — 전투 판별은 방 종류로 하고(<c>ChatContextResolver</c>)
+    /// 세로 위치는 <see cref="CombatBottomOffset"/>으로 잡는다. 덕분에 방 진입 직후처럼
+    /// 전투 노드가 아직 없는 시점에 계산해도 결과가 맞다.
     /// </summary>
     private static ChatPlacementResult ResolveCombat(Vector2 viewport)
     {

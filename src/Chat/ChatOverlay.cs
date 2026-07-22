@@ -281,10 +281,23 @@ public static class ChatOverlay
         StartPeekTimer();
     }
 
+    /// <summary>
+    /// 화면이 바뀌어 배치가 달라졌다.
+    ///
+    /// **`Refresh()`가 아니라 `Reposition()`을 부른다.** Refresh는 앞머리에서 창을 다시
+    /// 보이게 하므로(Visible·Modulate) 계기에서 부르면 조용히 닫혀 있던 창이 방을 옮길
+    /// 때마다 되살아난다. 계기가 시키는 것은 "다시 그려라"가 아니라 **"다시 놓아라"** 다.
+    /// </summary>
+    private static void OnContextChanged()
+    {
+        Reposition();
+    }
+
     private static void Hide()
     {
         State = ChatViewState.Hidden;
         CancelFade();
+        ContextWatcher.Stop();
 
         if (_frame != null && GodotObject.IsInstanceValid(_frame))
         {
@@ -381,6 +394,9 @@ public static class ChatOverlay
 
         _frame.Visible = true;
         _frame.Modulate = new Color(1f, 1f, 1f, 1f);
+
+        // 창이 떠 있는 동안 화면 전환을 지켜본다. 여기가 "창이 보이기 시작하는" 단일 지점이다.
+        ContextWatcher.Start(OnContextChanged);
 
         // **QueueFree만으로는 부족하다.** 실제 제거가 프레임 끝에 일어나므로 바로 뒤에서 크기를
         // 재면 옛 행과 새 행이 함께 잡혀 창이 내용보다 커진다. 트리에서 먼저 떼어내
@@ -641,6 +657,7 @@ public static class ChatOverlay
     private static void ClearNodes()
     {
         OutsideClickWatcher.Stop();
+        ContextWatcher.Stop();
         _root = null;
         _frame = null;
         _rows = null;
