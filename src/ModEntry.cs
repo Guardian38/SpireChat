@@ -15,8 +15,6 @@ namespace SpireChat;
 /// [ModInitializer]가 없으면 로더가 알아서 Harmony 인스턴스를 만들고 PatchAll을 호출하지만,
 /// 초기화 로그를 직접 통제하기 위해 명시적으로 둔다.
 ///
-/// **현 단계는 루프백 테스트 빌드다.** 실제 네트워크 송수신은 아직 없다.
-///
 /// 조작: <c>T</c>로 채팅창 열기, <c>ESC</c>로 닫기.
 /// 콘솔 명령: <c>chat</c>(채팅 토글), <c>imeprobe</c>(IME 진단, 검증 완료).
 /// </summary>
@@ -36,6 +34,9 @@ public static class ModEntry
         // 세션 추적·수신 보관을 시작한다. 채팅창을 한 번도 열지 않아도 메시지는 쌓여야 하므로
         // UI가 아니라 여기서 켠다.
         ChatService.Initialize();
+
+        // 창을 한 번도 열지 않아도 메시지가 오면 Peek이 떠야 하므로 여기서 구독을 건다.
+        ChatOverlay.Initialize();
 
         int patched = harmony.GetPatchedMethods().Count();
         Log.Info($"[{ModId}] loaded. Applied {patched} Harmony patch(es). Press T to open chat.");

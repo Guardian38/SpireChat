@@ -7,7 +7,7 @@ namespace SpireChat.Chat;
 ///
 /// 분리하는 이유는 주로 테스트다 — <see cref="LoopbackChatTransport"/>가 있으면
 /// 멀티플레이 세션 없이 혼자서 채팅 UI를 개발·검증할 수 있다. 부차적으로,
-/// 전송 방식을 바꿔야 할 때(설계 근거는 info_document/network_design.md §6) UI를 건드리지 않는다.
+/// 전송 방식을 바꿔야 할 때 UI를 건드리지 않는다.
 ///
 /// 구현체:
 ///  - <see cref="LoopbackChatTransport"/> — 개발·테스트용. 보낸 것을 자기에게 되돌려준다.

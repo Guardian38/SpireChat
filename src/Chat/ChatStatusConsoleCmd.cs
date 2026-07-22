@@ -41,6 +41,7 @@ public class ChatStatusConsoleCmd : AbstractConsoleCmd
         sb.Append($" | canSend={ChatService.CanSend}");
         sb.Append($" | history={ChatService.History.Count}");
         sb.Append($" | overlay={(ChatOverlay.IsOpen ? "open" : "closed")}");
+        sb.Append($"\n  ui: {ChatOverlay.DescribeGeometry()}");
 
         return new CmdResult(success: true, sb.ToString());
     }

@@ -203,7 +203,7 @@ public static class ImeProbe
     }
 
     /// <summary>
-    /// 한글 폰트 적용을 토글한다. 폰트 획득 로직은 <see cref="KoreanFont"/>가 단일 출처다.
+    /// 한글 폰트 적용을 토글한다. 폰트 획득 로직은 <see cref="LocaleFont"/>가 단일 출처다.
     /// </summary>
     private static void ApplyFont()
     {
@@ -214,12 +214,12 @@ public static class ImeProbe
 
         if (!_fontApplied)
         {
-            KoreanFont.Remove(_input, _dump);
+            LocaleFont.Remove(_input, _dump);
             _status.Text = "font: game default (Hangul may render as tofu)";
             return;
         }
 
-        _status.Text = KoreanFont.Apply(_input, _dump)
+        _status.Text = LocaleFont.Apply(_input, _dump)
             ? "font: bundled Korean font applied"
             : "font: FAILED to load the bundled Korean font";
     }
