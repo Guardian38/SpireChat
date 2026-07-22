@@ -5,7 +5,7 @@ using MegaCrit.Sts2.Core.Logging;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Multiplayer.Game;
 using MegaCrit.Sts2.Core.Platform;
-using MegaCrit.Sts2.Core.Runs;
+using SpireChat.Game;
 
 namespace SpireChat.Chat;
 
@@ -32,11 +32,6 @@ internal sealed class SenderRegistry : IDisposable
 
     /// <summary>senderId → 캐릭터. 방 진입마다 통째로 다시 만든다.</summary>
     private Dictionary<ulong, CharacterTag> _characters = new();
-
-    /// <summary>
-    /// 런 상태. <c>RunManager.State</c>가 private이라 이벤트로 받아 둔다.
-    /// </summary>
-    private RunState? _runState;
 
     private bool _subscribed;
 
@@ -79,7 +74,6 @@ internal sealed class SenderRegistry : IDisposable
         Unsubscribe();
         _nicknames.Clear();
         _characters.Clear();
-        _runState = null;
     }
 
     /// <summary>
@@ -117,14 +111,10 @@ internal sealed class SenderRegistry : IDisposable
     }
 
     /// <summary>
-    /// 런 이벤트를 구독한다.
+    /// 방이 바뀔 때마다 캐릭터를 다시 잡는다.
     ///
-    /// **`RoomEntered`가 공식 공개 이벤트라 Harmony 패치가 필요 없다**(`RunManager.cs:268`).
-    /// 설계 단계에서는 <c>EnterRoom</c>·<c>EnterRoomWithoutExitingCurrentRoom</c> 둘을 각각
-    /// 패치할 생각이었으나, 실제 발화 지점이 두 경로의 공통 내부(<c>EnterRoomInternal:1210</c>)라
-    /// 이벤트 하나가 맵 복귀까지 포함해 전부 덮는다.
-    ///
-    /// <c>RunManager.Instance</c>는 <c>= new RunManager()</c>라 항상 non-null이다.
+    /// **게임 이벤트를 직접 구독하지 않는다** — 런 이벤트 창구는 <see cref="RunTracker"/>
+    /// 하나다. 접점이 흩어지면 구독자마다 다른 런 상태를 볼 수 있다.
     /// </summary>
     private void Subscribe()
     {
@@ -133,20 +123,11 @@ internal sealed class SenderRegistry : IDisposable
             return;
         }
 
-        try
-        {
-            var runManager = RunManager.Instance;
-            runManager.RunStarted += OnRunStarted;
-            runManager.RoomEntered += OnRoomEntered;
-            _subscribed = true;
+        RunTracker.RoomChanged += OnRoomChanged;
+        _subscribed = true;
 
-            // 세션이 런 도중에 만들어질 수도 있으므로 현재 상태를 한 번 읽는다.
-            RefreshCharacters();
-        }
-        catch (Exception e)
-        {
-            Log.Error($"[{ModEntry.ModId}] SenderRegistry could not subscribe to run events: {e}");
-        }
+        // 세션이 런 도중에 만들어질 수도 있으므로 현재 상태를 한 번 읽는다.
+        RefreshCharacters();
     }
 
     private void Unsubscribe()
@@ -157,26 +138,10 @@ internal sealed class SenderRegistry : IDisposable
         }
 
         _subscribed = false;
-
-        try
-        {
-            var runManager = RunManager.Instance;
-            runManager.RunStarted -= OnRunStarted;
-            runManager.RoomEntered -= OnRoomEntered;
-        }
-        catch (Exception e)
-        {
-            Log.Warn($"[{ModEntry.ModId}] SenderRegistry could not unsubscribe: {e.Message}");
-        }
+        RunTracker.RoomChanged -= OnRoomChanged;
     }
 
-    private void OnRunStarted(RunState state)
-    {
-        _runState = state;
-        RefreshCharacters();
-    }
-
-    private void OnRoomEntered()
+    private void OnRoomChanged()
     {
         RefreshCharacters();
     }
@@ -190,7 +155,7 @@ internal sealed class SenderRegistry : IDisposable
     /// </summary>
     private void RefreshCharacters()
     {
-        var state = ResolveRunState();
+        var state = RunTracker.State;
         if (state == null)
         {
             // 런 밖(로비·메인 메뉴)이다. 이전 런의 캐릭터가 남지 않게 비운다.
@@ -233,32 +198,6 @@ internal sealed class SenderRegistry : IDisposable
 
         _characters = next;
         Changed?.Invoke();
-    }
-
-    /// <summary>
-    /// <c>RunManager.State</c>가 private이라 두 경로로 얻는다. 둘 다 공개 API다.
-    ///
-    /// 주 경로는 <c>RunStarted</c> 이벤트로 받아 둔 참조다. <c>DebugOnlyGetState</c>는
-    /// **이벤트를 놓쳤을 때만** 쓰는 폴백이다 — 게임이 "테스트 전용"이라 표시해 둔 메서드라
-    /// 의존을 최소화한다. 이 폴백이 없으면 이벤트를 한 번 놓쳤을 때 그 런 내내 캐릭터
-    /// 표시가 조용히 사라진다.
-    /// </summary>
-    private RunState? ResolveRunState()
-    {
-        if (_runState != null)
-        {
-            return _runState;
-        }
-
-        try
-        {
-            return RunManager.Instance.DebugOnlyGetState();
-        }
-        catch (Exception e)
-        {
-            Log.Warn($"[{ModEntry.ModId}] SenderRegistry could not read run state: {e.Message}");
-            return null;
-        }
     }
 
     /// <summary>

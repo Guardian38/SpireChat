@@ -4,6 +4,7 @@ using HarmonyLib;
 using MegaCrit.Sts2.Core.Logging;
 using MegaCrit.Sts2.Core.Modding;
 using SpireChat.Chat;
+using SpireChat.Game;
 
 namespace SpireChat;
 
@@ -30,6 +31,9 @@ public static class ModEntry
         // Harmony id는 모드별로 유일해야 한다. author.modId 규약을 따른다.
         var harmony = new Harmony($"GuardianGD.{ModId}");
         harmony.PatchAll(Assembly.GetExecutingAssembly());
+
+        // 런 이벤트 구독은 가장 먼저 건다 — 이후 구성요소가 전부 이 창구를 통해 런을 본다.
+        RunTracker.Initialize();
 
         // 세션 추적·수신 보관을 시작한다. 채팅창을 한 번도 열지 않아도 메시지는 쌓여야 하므로
         // UI가 아니라 여기서 켠다.
