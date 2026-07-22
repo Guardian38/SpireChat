@@ -1,5 +1,4 @@
 using Godot;
-using MegaCrit.Sts2.Core.Nodes.Combat;
 using MegaCrit.Sts2.Core.Nodes.Multiplayer;
 
 namespace SpireChat.Chat.Ui;
@@ -148,25 +147,8 @@ public static class ChatPlacement
         return new Vector2(x, y);
     }
 
-    /// <summary>진단용 — 배치 기준으로 삼는 노드들의 실제 기하를 덤프한다.</summary>
-    public static string DescribeAnchorSources(Control reference)
-    {
-        var viewport = reference.GetViewportRect().Size;
-        var hand = NPlayerHand.Instance;
-        var lobby = FindLobbyPlayerContainer();
-
-        string handInfo = hand == null
-            ? "hand=none"
-            : $"hand: pos={hand.Position} size={hand.Size} globalRect={hand.GetGlobalRect()}";
-
-        string lobbyInfo = lobby == null
-            ? "lobby=none"
-            : $"lobby: globalRect={lobby.GetGlobalRect()}";
-
-        return $"viewport={viewport} | {handInfo} | {lobbyInfo}";
-    }
-
-    private static NRemoteLobbyPlayerContainer? FindLobbyPlayerContainer()
+    /// <summary>배치 기준으로 쓰는 로비 노드. 진단 덤프(<see cref="PlacementProbe"/>)도 같은 것을 본다.</summary>
+    internal static NRemoteLobbyPlayerContainer? FindLobbyPlayerContainer()
     {
         if (Engine.GetMainLoop() is not SceneTree tree || tree.Root == null)
         {

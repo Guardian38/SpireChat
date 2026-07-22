@@ -484,8 +484,7 @@ public static class ChatOverlay
         return $"state={State} visible={_frame.Visible} pos={_frame.Position} size={_frame.Size} " +
                $"minSize={_frame.GetCombinedMinimumSize()} alpha={_frame.Modulate.A:F2} rows={rowCount} " +
                $"context={ChatContextResolver.Resolve()} senderCol={SenderColumn.Width:F0} " +
-               $"inTree={_frame.IsInsideTree()}\n  anchors: " +
-               ChatPlacement.DescribeAnchorSources(_frame);
+               $"inTree={_frame.IsInsideTree()}";
     }
 
     /// <summary>
