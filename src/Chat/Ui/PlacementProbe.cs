@@ -68,14 +68,13 @@ internal static class PlacementProbe
         var holder = holders[mid];
 
         sb.Append($"\n    holder[{mid}]: pos={holder.Position} size={holder.Size} scale={holder.Scale} " +
-                  $"pivot={holder.PivotOffset} globalRect={holder.GetGlobalRect()} " +
-                  $"visual={ChatPlacement.VisualRect(holder)}");
+                  $"pivot={holder.PivotOffset} globalRect={holder.GetGlobalRect()} visual={VisualRect(holder)}");
 
         var hitbox = holder.Hitbox;
         sb.Append(hitbox == null || !GodotObject.IsInstanceValid(hitbox)
             ? "\n    hitbox=none"
             : $"\n    hitbox: pos={hitbox.Position} size={hitbox.Size} " +
-              $"globalRect={hitbox.GetGlobalRect()} visual={ChatPlacement.VisualRect(hitbox)}");
+              $"globalRect={hitbox.GetGlobalRect()} visual={VisualRect(hitbox)}");
 
         // 실제로 필요한 값 셋. 특히 fromScreenBottom은 CombatBottomOffset(300)과 직접 비교된다.
         float top = CardTopY(holders);
@@ -85,13 +84,11 @@ internal static class PlacementProbe
     }
 
     /// <summary>
-    /// 로비 — 플레이어 목록 기하. **배치가 쓰는 항목 합집합과, 쓰지 않는 컨테이너 Rect를
-    /// 나란히 찍는다.** 셋을 함께 봐야 어느 것이 시각적 경계인지 갈린다 — 실제로 바깥과
-    /// 자식 <c>Container</c>가 둘 다 518이라, 항목 합집합이 없었으면 거기서 막혔다.
+    /// 로비 — 플레이어 목록 기하. **바깥 Control과 자식 <c>Container</c>를 나란히 찍는다.**
     ///
-    /// 합집합 자체는 <see cref="ChatPlacement.MeasureLobbyItems"/>가 계산한다. 여기서 다시
-    /// 세면 덤프와 배치가 갈라진다. 대신 **타입으로 거르기 전 값**을 곁들여, 초대 버튼처럼
-    /// 섞여 있는 자식이 기준을 얼마나 흔드는지 보이게 한다.
+    /// 지금 배치는 바깥 Rect의 오른쪽 끝을 쓰는데, 바깥이 레이아웃용으로 넓게 잡혀 있으면
+    /// 목록의 시각적 오른쪽 끝보다 훨씬 오른쪽이 된다 — 창이 화면 중앙으로 밀린 유력한 원인이다.
+    /// 자식 항목들의 합집합까지 찍어야 셋 중 어느 것이 시각적 경계인지 갈린다.
     /// </summary>
     private static void AppendLobby(StringBuilder sb)
     {
@@ -103,7 +100,7 @@ internal static class PlacementProbe
         }
 
         sb.Append($"\n    lobbyOuter: pos={outer.Position} size={outer.Size} " +
-                  $"globalRect={outer.GetGlobalRect()} visual={ChatPlacement.VisualRect(outer)}");
+                  $"globalRect={outer.GetGlobalRect()} visual={VisualRect(outer)}");
 
         // "Container"는 유니크 이름(%)이 아닌 평범한 자식 경로라 리플렉션 없이 잡힌다
         // (NRemoteLobbyPlayerContainer.cs:88). 형제인 %SoloLabel은 이 바깥에 있다.
@@ -116,23 +113,10 @@ internal static class PlacementProbe
 
         sb.Append($"\n    lobbyInner: class={inner.GetClass()} children={inner.GetChildCount()} " +
                   $"pos={inner.Position} size={inner.Size} " +
-                  $"globalRect={inner.GetGlobalRect()} visual={ChatPlacement.VisualRect(inner)}");
+                  $"globalRect={inner.GetGlobalRect()} visual={VisualRect(inner)}");
 
-        var union = ChatPlacement.MeasureLobbyItems(out int counted);
-        sb.Append(union == null
-            ? "\n    lobbyItems: n=0 (→ 폴백 좌표를 쓴다)"
-            : $"\n    lobbyItems: n={counted} union={union.Value} (배치가 쓰는 값)");
-
-        AppendLobbyAllChildren(sb, inner);
-    }
-
-    /// <summary>대조용 — 타입을 안 가리고 합친 값. 배치가 쓰는 합집합과 벌어지면 그 차이가
-    /// 초대 버튼 등 섞여 있는 자식의 몫이다.</summary>
-    private static void AppendLobbyAllChildren(StringBuilder sb, Container inner)
-    {
         Rect2? union = null;
         int counted = 0;
-
         foreach (var child in inner.GetChildren())
         {
             if (child is not Control control || !control.IsVisibleInTree())
@@ -140,14 +124,14 @@ internal static class PlacementProbe
                 continue;
             }
 
-            var rect = ChatPlacement.VisualRect(control);
+            var rect = VisualRect(control);
             union = union == null ? rect : union.Value.Merge(rect);
             counted++;
         }
 
         sb.Append(union == null
-            ? "\n    lobbyAll: n=0"
-            : $"\n    lobbyAll: n={counted} union={union.Value} (타입 미분류 — 대조용)");
+            ? "\n    lobbyItems: n=0"
+            : $"\n    lobbyItems: n={counted} union={union.Value}");
     }
 
     /// <summary>화면상 가장 높은 카드의 위쪽 끝(global y). 손패에서 창까지의 간격 기준이다.</summary>
@@ -159,10 +143,23 @@ internal static class PlacementProbe
         {
             var hitbox = holder.Hitbox;
             var target = hitbox != null && GodotObject.IsInstanceValid(hitbox) ? hitbox : (Control)holder;
-            top = Mathf.Min(top, ChatPlacement.VisualRect(target).Position.Y);
+            top = Mathf.Min(top, VisualRect(target).Position.Y);
         }
 
         return top;
+    }
+
+    /// <summary>
+    /// 화면상 실제 영역.
+    ///
+    /// **<c>GetGlobalRect()</c>는 Scale을 반영하지 않는다** — Size가 로컬 값 그대로라
+    /// 기본 0.8배로 줄어 있는 손패 카드에서는 실제보다 큰 rect가 나온다. 전역 변환에서
+    /// 원점과 배율을 직접 꺼내 곱해야 눈에 보이는 영역과 일치한다.
+    /// </summary>
+    private static Rect2 VisualRect(Control control)
+    {
+        var transform = control.GetGlobalTransform();
+        return new Rect2(transform.Origin, control.Size * transform.Scale);
     }
 
     private static Vector2 GetViewportSize()

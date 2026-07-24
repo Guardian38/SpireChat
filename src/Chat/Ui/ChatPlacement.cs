@@ -39,8 +39,7 @@ public readonly struct ChatPlacementResult
 /// 소스로 알 수 없다는 점은 같지만, 노드 Rect가 쓸 만한지가 갈린다.
 ///
 /// <list type="bullet">
-/// <item>로비 — 플레이어 항목들을 <b>런타임에 찾아 화면상 Rect를 합친다.</b> 컨테이너
-///       Rect는 목록보다 넓어 쓸 수 없다(<see cref="MeasureLobbyItems"/>).</item>
+/// <item>로비 — 플레이어 목록 노드를 <b>런타임에 찾아 Rect를 읽는다.</b></item>
 /// <item>전투 — 손패 Rect는 <b>쓰지 않는다.</b> 화면 하단 기준 상수를 쓴다
 ///       (<see cref="CombatBottomOffset"/> 주석).</item>
 /// </list>
@@ -83,7 +82,7 @@ public static class ChatPlacement
                 return ResolveCombat(viewport);
 
             case ChatContext.Lobby:
-                return ResolveLobby();
+                return ResolveLobby(viewport);
 
             default:
                 return BottomFallback(viewport);
@@ -108,22 +107,22 @@ public static class ChatPlacement
     /// <summary>
     /// 로비 — 플레이어 목록 오른쪽. 목록과 채팅이 한 시야에 들어와야 이름↔플레이어가 이어진다.
     ///
-    /// 기준은 <see cref="MeasureLobbyItems"/>의 합집합이다. 항목이 없으면(목록 노드를 못
-    /// 찾았거나 로컬 플레이어를 표시하지 않는 화면) 화면 마진 폴백으로 떨어진다.
+    /// <c>NCharacterSelectScreen</c>에는 static Instance가 없고 컨테이너 필드도 private이라
+    /// **씬 트리에서 타입으로 찾는다.** 커스텀런·데일리런 화면은 목록 노드가 미조사라,
+    /// 못 찾으면 화면 기준 폴백으로 떨어진다.
     /// </summary>
-    private static ChatPlacementResult ResolveLobby()
+    private static ChatPlacementResult ResolveLobby(Vector2 viewport)
     {
-        var union = MeasureLobbyItems(out _);
-        if (union == null)
+        var container = FindLobbyPlayerContainer();
+        if (container == null)
         {
             return new ChatPlacementResult(
                 new Vector2(ScreenMargin, ScreenMargin), GrowDirection.Down, Width);
         }
 
+        var rect = container.GetGlobalRect();
         return new ChatPlacementResult(
-            new Vector2(union.Value.End.X + LobbyGap, union.Value.Position.Y),
-            GrowDirection.Down,
-            Width);
+            new Vector2(rect.End.X + LobbyGap, rect.Position.Y), GrowDirection.Down, Width);
     }
 
     /// <summary>전투 밖(맵·상점·이벤트)과 세션 밖의 공통 폴백 — 화면 하단 중앙.</summary>
@@ -158,58 +157,6 @@ public static class ChatPlacement
         }
 
         return FindDescendant<NRemoteLobbyPlayerContainer>(tree.Root);
-    }
-
-    /// <summary>
-    /// 로비 목록의 화면상 경계 — 플레이어 항목들의 Rect 합집합. 항목이 없으면 null이다.
-    ///
-    /// **컨테이너 Rect를 쓰지 않는다.** 바깥 Control과 자식 "Container"가 둘 다 실제 항목보다
-    /// 213px 넓어(실측), 그 오른쪽 끝을 기준으로 잡으면 창이 화면 중앙까지 밀린다.
-    ///
-    /// **타입으로 거른다.** 같은 컨테이너에 초대 버튼의 부모가 섞여 들어와 있고 그 버튼은
-    /// 만석이 되면 스스로 숨는다 — 함께 재면 마지막 한 명이 들어오는 순간 기준이 흔들린다.
-    ///
-    /// 진단 덤프(<see cref="PlacementProbe"/>)도 이것을 부른다. 계산이 갈라지면 "덤프는 맞는데
-    /// 배치는 틀린" 상태가 되어 진단이 배치를 검증하지 못한다.
-    /// </summary>
-    internal static Rect2? MeasureLobbyItems(out int count)
-    {
-        count = 0;
-
-        // "Container"는 유니크 이름(%)이 아닌 평범한 자식 경로라 리플렉션 없이 잡힌다.
-        var inner = FindLobbyPlayerContainer()?.GetNodeOrNull<Container>("Container");
-        if (inner == null)
-        {
-            return null;
-        }
-
-        Rect2? union = null;
-        foreach (var child in inner.GetChildren())
-        {
-            if (child is not NRemoteLobbyPlayer item || !item.IsVisibleInTree())
-            {
-                continue;
-            }
-
-            var rect = VisualRect(item);
-            union = union == null ? rect : union.Value.Merge(rect);
-            count++;
-        }
-
-        return union;
-    }
-
-    /// <summary>
-    /// 화면상 실제 영역.
-    ///
-    /// **<c>GetGlobalRect()</c>는 Scale을 반영하지 않는다** — Size가 로컬 값 그대로라 축소된
-    /// 노드에서는 실제보다 큰 rect가 나온다. 전역 변환에서 원점과 배율을 직접 꺼내 곱해야
-    /// 눈에 보이는 영역과 일치한다.
-    /// </summary>
-    internal static Rect2 VisualRect(Control control)
-    {
-        var transform = control.GetGlobalTransform();
-        return new Rect2(transform.Origin, control.Size * transform.Scale);
     }
 
     /// <summary>씬 트리를 훑어 타입이 맞는 첫 노드를 찾는다. 못 찾으면 null이다.</summary>
