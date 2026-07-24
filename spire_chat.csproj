@@ -24,7 +24,18 @@
     <!-- 게임이 자기 ALC에 우리 DLL을 로드하므로 참조 어셈블리를 같이 배포하면 타입이 충돌한다. -->
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
 
-    <DebugType>portable</DebugType>
+    <!--
+      pdb를 DLL 안에 내장한다. 파일이 하나뿐이라 dll↔pdb 짝이 어긋날 수 없고, 배포물에서
+      빠뜨릴 수도 없다 — 유저가 보내온 크래시 로그의 줄 번호를 신뢰할 수 있게 하는 것이 목적이다.
+    -->
+    <DebugType>embedded</DebugType>
+
+    <!--
+      산출물에 빌드 머신의 절대경로(사용자명 포함)가 박히는 것을 막는다. 줄 번호는 그대로 남는다.
+      pdb를 빼도 DLL의 디버그 디렉터리에 경로가 남으므로, 치환이 유일한 해결책이다.
+    -->
+    <PathMap>$(MSBuildProjectDirectory)=/spire_chat</PathMap>
+
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
   </PropertyGroup>
 
@@ -61,8 +72,8 @@
   <Target Name="DeployToMods" AfterTargets="Build" Condition="'$(DeployToGame)' == 'true'">
     <MakeDir Directories="$(ModDeployDir)" />
     <ItemGroup>
+      <!-- pdb는 DLL에 내장되므로(DebugType=embedded) 따로 복사할 파일이 없다. -->
       <DeployFiles Include="$(OutputPath)spire_chat.dll" />
-      <DeployFiles Include="$(OutputPath)spire_chat.pdb" Condition="Exists('$(OutputPath)spire_chat.pdb')" />
       <DeployFiles Include="$(MSBuildProjectDirectory)\mod_manifest.json" />
     </ItemGroup>
     <Copy SourceFiles="@(DeployFiles)" DestinationFolder="$(ModDeployDir)" SkipUnchangedFiles="true" />
