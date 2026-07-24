@@ -3,7 +3,7 @@
   "name": "Spire Chat",
   "author": "GuardianGD",
   "description": "In-game text chat for multiplayer runs. Press T to open the chat window.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "has_pck": false,
   "has_dll": true,
   "dependencies": [],
