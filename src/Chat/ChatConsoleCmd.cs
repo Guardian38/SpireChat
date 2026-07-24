@@ -10,8 +10,9 @@ namespace SpireChat.Chat;
 /// 게임이 모드 어셈블리의 <see cref="AbstractConsoleCmd"/> 서브타입을 자동 등록하므로
 /// 별도 등록 코드가 필요 없다. public + 매개변수 없는 생성자라야 인스턴스화된다.
 ///
-/// 지금은 개발용 진입점이다. 실제 사용 시에는 단축키(Enter 등)로 열게 되며,
-/// 그때 게임 단축키와의 충돌 처리가 필요하다.
+/// **열림 조건을 일부러 우회한다.** <c>T</c>는 멀티 세션에서만 열리지만
+/// 이 명령은 세션 밖에서도 연다 — 레이아웃·폰트를 세션 없이 확인하는 개발 수단이기 때문이다.
+/// <c>AbstractConsoleCmd.DebugOnly</c>가 기본 <c>true</c>라 일반 사용자에게는 노출되지 않는다.
 /// </summary>
 public class ChatConsoleCmd : AbstractConsoleCmd
 {

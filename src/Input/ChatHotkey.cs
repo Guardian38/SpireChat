@@ -61,8 +61,23 @@ public static class ChatHotkey
         InputMap.ActionAddEvent(ActionName, new InputEventKey { PhysicalKeycode = Key.T });
     }
 
+    /// <summary>
+    /// <c>T</c>가 눌렸을 때. **멀티 세션에서만 연다.**
+    ///
+    /// 조건에 맞지 않으면 **아무 일도 하지 않는다.** 안내 문구도 띄우지 않는다 —
+    /// 메인 메뉴에서 T를 누른 사람은 대개 게임의 다른 조작을 의도한 것이라,
+    /// 채팅 관련 안내가 뜨면 그쪽이 더 뜬금없다.
+    ///
+    /// 이미 열려 있으면 조건과 무관하게 닫을 수 있게 둔다 — 콘솔 <c>chat</c>으로 세션 밖에서
+    /// 연 경우(개발 경로)에도 T로 닫히는 편이 자연스럽다.
+    /// </summary>
     private static void OnTogglePressed()
     {
+        if (!ChatService.CanChat && !ChatOverlay.IsOpen)
+        {
+            return;
+        }
+
         ChatOverlay.Toggle();
     }
 }

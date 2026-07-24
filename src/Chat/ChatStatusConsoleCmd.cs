@@ -2,7 +2,9 @@ using System.Text;
 using MegaCrit.Sts2.Core.DevConsole;
 using MegaCrit.Sts2.Core.DevConsole.ConsoleCommands;
 using MegaCrit.Sts2.Core.Entities.Players;
+using MegaCrit.Sts2.Core.Logging;
 using SpireChat.Chat.Net;
+using SpireChat.Chat.Ui;
 
 namespace SpireChat.Chat;
 
@@ -41,7 +43,33 @@ public class ChatStatusConsoleCmd : AbstractConsoleCmd
         sb.Append($" | canSend={ChatService.CanSend}");
         sb.Append($" | history={ChatService.History.Count}");
         sb.Append($" | overlay={(ChatOverlay.IsOpen ? "open" : "closed")}");
+        sb.Append($"\n  ui: {ChatOverlay.DescribeGeometry()}");
 
-        return new CmdResult(success: true, sb.ToString());
+        // 배치 기준 덤프는 오버레이가 없어도 찍는다 — 창을 띄우지 않고도 기하를 재기 위함이다.
+        sb.Append($"\n  anchors: {PlacementProbe.Describe()}");
+
+        string dump = sb.ToString();
+        LogDump(dump);
+
+        return new CmdResult(success: true, dump);
+    }
+
+    /// <summary>
+    /// 덤프를 <c>godot.log</c>에도 남긴다. 콘솔 출력은 화면에만 있어 눈으로 옮겨 적어야 하는데,
+    /// 배치 실측은 픽셀 단위 대조라 그 과정에서 값이 틀어지면 그대로 잘못된 상수가 된다.
+    ///
+    /// **줄마다 따로 남기는 것이 요점이다** — 한 덩어리로 남기면 <c>[spire_chat]</c>으로 훑을 때
+    /// 첫 줄만 걸리고 정작 좌표가 있는 나머지 줄이 빠진다.
+    /// </summary>
+    private static void LogDump(string dump)
+    {
+        foreach (string line in dump.Split('\n'))
+        {
+            string trimmed = line.Trim();
+            if (trimmed.Length > 0)
+            {
+                Log.Info($"[{ModEntry.ModId}] chatstatus | {trimmed}");
+            }
+        }
     }
 }

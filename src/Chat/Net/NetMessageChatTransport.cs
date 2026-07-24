@@ -8,7 +8,7 @@ namespace SpireChat.Chat.Net;
 /// 실제 네트워크 전송. 게임의 <c>INetMessage</c> 확장점을 그대로 쓴다.
 ///
 /// vanilla <c>ReactionSynchronizer</c>와 같은 형태다 — 생성자에서 핸들러를 등록하고
-/// <see cref="Stop"/>에서 해제한다. 설계 근거는 info_document/network_design.md §5.2.
+/// <see cref="Stop"/>에서 해제한다.
 ///
 /// 서비스 인스턴스는 **주입받는다.** 어디서 얻을지는 <see cref="NetServiceTracker"/>가 알고,
 /// 이 클래스는 주어진 서비스로 주고받기만 한다.
@@ -72,7 +72,7 @@ public sealed class NetMessageChatTransport : IChatTransport
         // **로컬 에코는 우리가 만든다.** ShouldBroadcast=true라도 호스트는 발신자를 중계
         // 대상에서 제외하고(NetHostGameService.cs:120-142), 호스트가 보낼 때도 로컬 핸들러를
         // 부르지 않는다. 즉 자기 메시지는 절대 자기에게 돌아오지 않는다.
-        // 여기서 직접 발생시켜야 UI가 루프백과 동일한 흐름을 보게 된다 — §5.2.
+        // 여기서 직접 발생시켜야 UI가 루프백과 동일한 흐름을 보게 된다.
         Received?.Invoke(_netService.NetId, text);
     }
 
